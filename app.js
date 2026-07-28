@@ -527,11 +527,17 @@ async function openEditRecordSheet(id) {
   const options = dict.map((t) => `<option value="${t.key}">${t.label}</option>`).join('');
 
   const rows = measurements.map((m) => `
-    <div class="row" style="gap:8px;margin-bottom:8px;align-items:center" data-existing-row="${m.id}">
+    <div class="row" style="gap:8px;margin-bottom:4px;align-items:center" data-existing-row="${m.id}">
       <input type="checkbox" checked class="edit-keep" data-mid="${m.id}" style="width:auto;margin:0">
       <span style="flex:1">${m.label}</span>
-      <input type="number" step="0.01" value="${m.value}" class="edit-value" data-mid="${m.id}" style="width:90px;margin:0">
-      <span class="muted" style="width:60px">${m.unit || ''}</span>
+      <input type="number" step="0.01" value="${m.value}" class="edit-value" data-mid="${m.id}" style="width:80px;margin:0">
+      <input value="${m.unit || ''}" class="edit-unit" data-mid="${m.id}" placeholder="од." style="width:60px;margin:0">
+    </div>
+    <div class="row" style="gap:8px;margin:0 0 10px 28px;align-items:center">
+      <span class="muted" style="font-size:12px;width:60px">Норма:</span>
+      <input type="number" step="0.01" value="${m.ref ? m.ref[0] : ''}" placeholder="від" class="edit-ref-low" data-mid="${m.id}" style="width:70px;margin:0;font-size:13px">
+      <span class="muted">–</span>
+      <input type="number" step="0.01" value="${m.ref ? m.ref[1] : ''}" placeholder="до" class="edit-ref-high" data-mid="${m.id}" style="width:70px;margin:0;font-size:13px">
     </div>`).join('');
 
   openSheet(`
@@ -541,7 +547,7 @@ async function openEditRecordSheet(id) {
     <input id="edit-title" value="${rec.title}">
     <label>Дата</label>
     <input id="edit-date" type="date" value="${rec.createdAt}">
-    ${measurements.length ? `<h2 style="margin-top:14px">Показники</h2><p class="muted">Зніми ✓, щоб видалити показник із запису.</p>${rows}` : ''}
+    ${measurements.length ? `<h2 style="margin-top:14px">Показники</h2><p class="muted">Зніми ✓, щоб видалити показник. Можна поправити значення, одиницю виміру й межі норми.</p>${rows}` : ''}
     <h2 style="margin-top:14px">Додати показник</h2>
     <div id="edit-new-rows"></div>
     <button class="btn ghost" id="btn-add-row" type="button">＋ Додати рядок</button>
@@ -575,7 +581,12 @@ async function openEditRecordSheet(id) {
       const keepBox = document.querySelector(`.edit-keep[data-mid="${m.id}"]`);
       if (keepBox.checked) {
         const valInput = document.querySelector(`.edit-value[data-mid="${m.id}"]`);
-        await dbPut('measurements', { ...m, value: parseFloat(valInput.value), date });
+        const unitInput = document.querySelector(`.edit-unit[data-mid="${m.id}"]`);
+        const lowInput = document.querySelector(`.edit-ref-low[data-mid="${m.id}"]`);
+        const highInput = document.querySelector(`.edit-ref-high[data-mid="${m.id}"]`);
+        const low = parseFloat(lowInput.value), high = parseFloat(highInput.value);
+        const ref = (!isNaN(low) && !isNaN(high)) ? [low, high] : null;
+        await dbPut('measurements', { ...m, value: parseFloat(valInput.value), unit: unitInput.value.trim(), ref, date });
         keptCount++;
       } else {
         await dbDelete('measurements', m.id);
