@@ -1,4 +1,4 @@
-const CACHE = 'health-vault-v8';
+const CACHE = 'health-vault-v10';
 const ASSETS = [
   './',
   './index.html',
@@ -35,4 +35,30 @@ self.addEventListener('fetch', (e) => {
       caches.match(e.request).then((cached) => cached || fetch(e.request))
     );
   }
+});
+
+// Показуємо системне сповіщення, коли прийшов push із сервера нагадувань.
+self.addEventListener('push', (e) => {
+  let data = { title: 'My BioScan', body: 'Час перевірити нагадування' };
+  try { if (e.data) data = { ...data, ...e.data.json() }; } catch {}
+  e.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: './icons/icon-192.png',
+      badge: './icons/icon-192.png',
+    })
+  );
+});
+
+// Тап по сповіщенню — відкрити додаток (або сфокусувати, якщо вже відкритий).
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      for (const c of clients) {
+        if ('focus' in c) return c.focus();
+      }
+      if (self.clients.openWindow) return self.clients.openWindow('./');
+    })
+  );
 });

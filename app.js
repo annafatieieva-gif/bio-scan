@@ -80,6 +80,18 @@ function fmtDate(d) {
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
+
+// data: URL → Blob. Надійніше для великих PDF, ніж пряме href="data:..." —
+// у Safari/PWA такі посилання інколи відкриваються порожньою сторінкою.
+function dataURLtoBlob(dataurl) {
+  const [header, base64] = dataurl.split(',');
+  const mimeMatch = header.match(/data:(.*?);base64/);
+  const mime = mimeMatch ? mimeMatch[1] : 'application/pdf';
+  const bin = atob(base64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
 function daysBetween(a, b) {
   return Math.round((new Date(b) - new Date(a)) / 86400000);
 }
@@ -443,7 +455,7 @@ async function openRecordDetail(id) {
   const measurements = (await dbGetAll('measurements')).filter((m) => m.recordId === id);
   let media = '';
   if (rec.type === 'photo' && rec.thumb) media = `<img src="${rec.thumb}" style="width:100%;border-radius:12px;margin-bottom:12px">`;
-  if (rec.type === 'pdf' && rec.fileData) media = `<a class="btn secondary" href="${rec.fileData}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block;margin-bottom:12px">⬇ Відкрити PDF</a>`;
+  if (rec.type === 'pdf' && rec.fileData) media = `<button class="btn secondary" id="btn-open-pdf" style="display:inline-block;margin-bottom:12px">⬇ Відкрити PDF</button>`;
 
   let markerRows = measurements.map((m) => `<tr><td>${m.label}</td><td>${m.value} ${m.unit}</td></tr>`).join('');
 
@@ -460,6 +472,15 @@ async function openRecordDetail(id) {
     </div>
   `);
   document.getElementById('btn-close-record').onclick = closeSheet;
+  const openPdfBtn = document.getElementById('btn-open-pdf');
+  if (openPdfBtn) {
+    openPdfBtn.onclick = () => {
+      const blob = dataURLtoBlob(rec.fileData);
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    };
+  }
   document.getElementById('btn-edit-record').onclick = () => openEditRecordSheet(id);
   document.getElementById('btn-delete-record').onclick = async () => {
     await dbDelete('records', id);
@@ -690,10 +711,11 @@ function drawTrendChart() {
 // ---------- REMINDERS ----------
 async function viewReminders() {
   const tests = await dbGetAll('trackedTests');
+  const pushCard = await renderPushCard();
   if (!tests.length) {
     // засіяти дефолтний набір при першому відкритті
     return `<h1>Нагадування</h1><div class="empty"><img src="assets/empty-illustration.svg" class="empty-illustration" alt=""><p>Додай аналізи, за якими хочеш стежити регулярно.</p>
-    <button class="btn" id="btn-seed-defaults" style="margin-top:14px">Додати типовий набір</button></div>`;
+    <button class="btn" id="btn-seed-defaults" style="margin-top:14px">Додати типовий набір</button></div>${pushCard}`;
   }
   const withStatus = tests.map(statusOf).sort((a, b) => a.daysLeft - b.daysLeft);
   let html = `<h1>Нагадування</h1><div class="card">`;
@@ -711,8 +733,31 @@ async function viewReminders() {
       </div>
     </div>`;
   });
-  html += `</div>`;
+  html += `</div>${pushCard}`;
   return html;
+}
+
+async function renderPushCard() {
+  const settings = await getPushSettings();
+  if (settings.subscribed) {
+    return `<div class="card ok">
+      <h2>🔔 Сповіщення</h2>
+      <p class="muted">Увімкнено. Прийде push, навіть якщо додаток закритий.</p>
+      <div class="btn-row">
+        <button class="btn ghost" id="btn-test-push">Надіслати тестове</button>
+        <button class="btn ghost" id="btn-disable-push">Вимкнути</button>
+      </div>
+    </div>`;
+  }
+  return `<div class="card">
+    <h2>🔔 Сповіщення</h2>
+    <p class="muted">Щоб нагадування приходили як справжній push, навіть коли додаток закритий, потрібен окремий невеликий сервер (розгортається безкоштовно на Cloudflare — інструкція в README, файл server/worker.js).</p>
+    <label>Адреса сервера сповіщень</label>
+    <input id="push-server-url" placeholder="https://....workers.dev" value="${settings.serverUrl || ''}">
+    <div class="btn-row">
+      <button class="btn" id="btn-enable-push">Увімкнути сповіщення</button>
+    </div>
+  </div>`;
 }
 
 async function openAddTestSheet() {
@@ -737,6 +782,8 @@ async function openAddTestSheet() {
     const last = document.getElementById('test-last').value || null;
     if (!label) { toast('Введи назву'); return; }
     await dbPut('trackedTests', { key: uid(), label, freq, lastDate: last });
+    const ps = await getPushSettings();
+    if (ps.subscribed) syncRemindersToServer(ps.serverUrl).catch(() => {});
     closeSheet();
     render();
   };
@@ -805,6 +852,8 @@ function attachViewHandlers() {
       const t = tests.find((x) => x.key === el.dataset.done);
       t.lastDate = todayISO();
       await dbPut('trackedTests', t);
+      const ps = await getPushSettings();
+      if (ps.subscribed) syncRemindersToServer(ps.serverUrl).catch(() => {});
       toast('Позначено виконаним');
       render();
     });
@@ -822,9 +871,137 @@ function attachViewHandlers() {
       for (const t of DEFAULT_TESTS) {
         await dbPut('trackedTests', { key: uid(), label: t.label, freq: t.freq, lastDate: null });
       }
+      const ps = await getPushSettings();
+      if (ps.subscribed) syncRemindersToServer(ps.serverUrl).catch(() => {});
       render();
     });
   }
+
+  const enableBtn = document.getElementById('btn-enable-push');
+  if (enableBtn) {
+    enableBtn.addEventListener('click', async () => {
+      const url = document.getElementById('push-server-url').value.trim();
+      if (!url) { toast('Встав адресу сервера'); return; }
+      enableBtn.textContent = 'Вмикаю…';
+      try {
+        await enablePush(url);
+        toast('Сповіщення увімкнено ✓');
+        render();
+      } catch (e) {
+        toast('Не вдалось: ' + e.message);
+        enableBtn.textContent = 'Увімкнути сповіщення';
+      }
+    });
+  }
+  const disableBtn = document.getElementById('btn-disable-push');
+  if (disableBtn) {
+    disableBtn.addEventListener('click', async () => {
+      await disablePush();
+      toast('Сповіщення вимкнено');
+      render();
+    });
+  }
+  const testBtn = document.getElementById('btn-test-push');
+  if (testBtn) {
+    testBtn.addEventListener('click', async () => {
+      testBtn.textContent = 'Надсилаю…';
+      try {
+        await sendTestPush();
+        toast('Тестове сповіщення надіслано — має прийти за кілька секунд');
+      } catch (e) {
+        toast('Помилка: ' + e.message);
+      }
+      testBtn.textContent = 'Надіслати тестове';
+    });
+  }
+}
+
+// ---------- PUSH-СПОВІЩЕННЯ (опційно, через власний сервер) ----------
+// Публічний VAPID-ключ — не секрет, безпечно тримати в коді.
+const VAPID_PUBLIC_KEY = 'BNwlB4UxR7eKB4SwHNnI8ZWJccDdWtVyGxWoGaIlc6AFONbhXuiNXlr28Cetsz5LbM1COBn4ond5hr-BYirLzRE';
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+
+async function getPushSettings() {
+  try {
+    const s = await reqToPromise(store('settings').get('push'));
+    return (s && s.value) || { serverUrl: '', subscribed: false };
+  } catch { return { serverUrl: '', subscribed: false }; }
+}
+async function savePushSettings(val) {
+  await dbPut('settings', { key: 'push', value: val });
+}
+
+async function enablePush(serverUrl) {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    throw new Error('Цей браузер не підтримує push-сповіщення');
+  }
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') throw new Error('Дозвіл на сповіщення не надано');
+
+  const reg = await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) {
+    sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
+  }
+
+  await syncRemindersToServer(serverUrl, sub);
+  await savePushSettings({ serverUrl, subscribed: true });
+}
+
+async function disablePush() {
+  const settings = await getPushSettings();
+  const reg = await navigator.serviceWorker.ready;
+  const sub = await reg.pushManager.getSubscription();
+  if (sub) {
+    if (settings.serverUrl) {
+      try {
+        await fetch(settings.serverUrl.replace(/\/$/, '') + '/unsubscribe', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ endpoint: sub.endpoint }),
+        });
+      } catch {}
+    }
+    await sub.unsubscribe();
+  }
+  await savePushSettings({ serverUrl: settings.serverUrl, subscribed: false });
+}
+
+// Надсилає серверу лише назви аналізів, періодичність і дати — без жодних
+// медичних даних (без результатів, без фото/PDF).
+async function syncRemindersToServer(serverUrl, subOverride) {
+  const settings = subOverride ? { serverUrl, subscribed: true } : await getPushSettings();
+  if (!settings.subscribed && !subOverride) return;
+  const reg = await navigator.serviceWorker.ready;
+  const sub = subOverride || await reg.pushManager.getSubscription();
+  if (!sub) return;
+  const tests = await dbGetAll('trackedTests');
+  const reminders = tests.map((t) => ({ key: t.key, label: t.label, freq: t.freq, lastDate: t.lastDate || null }));
+  await fetch(serverUrl.replace(/\/$/, '') + '/subscribe', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ subscription: sub.toJSON(), reminders }),
+  });
+}
+
+async function sendTestPush() {
+  const settings = await getPushSettings();
+  if (!settings.serverUrl) throw new Error('Спершу вкажи адресу сервера');
+  const reg = await navigator.serviceWorker.ready;
+  const sub = await reg.pushManager.getSubscription();
+  if (!sub) throw new Error('Підписки ще немає');
+  const res = await fetch(settings.serverUrl.replace(/\/$/, '') + '/test', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ subscription: sub.toJSON() }),
+  });
+  if (!res.ok) throw new Error('Сервер відповів помилкою');
 }
 
 // ---------- init ----------
