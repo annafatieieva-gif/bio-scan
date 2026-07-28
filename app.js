@@ -161,8 +161,20 @@ async function viewHome() {
 
   const records = await dbGetAll('records');
   const measurements = await dbGetAll('measurements');
+  const outOfRange = latestOutOfRangeMarkers(measurements);
 
   let html = `<h1>Вітаю 👋</h1>`;
+
+  if (outOfRange.length) {
+    html += `<div class="card alert"><h2>⚠️ Поза межами норми</h2>`;
+    outOfRange.forEach((m) => {
+      html += `<div class="row" style="padding:8px 0;border-bottom:1px solid var(--line)">
+        <div><strong>${m.label}</strong><br><span class="muted">${fmtDate(m.date)} · ${m.value} ${m.unit || ''}</span></div>
+        <span class="badge overdue">норма ${m.ref[0]}–${m.ref[1] >= 999 ? '∞' : m.ref[1]}</span>
+      </div>`;
+    });
+    html += `</div>`;
+  }
 
   if (overdue.length) {
     html += `<div class="card alert"><h2>Прострочено</h2>`;
@@ -186,6 +198,21 @@ async function viewHome() {
   </div>`;
 
   return html;
+}
+
+// Для кожного показника бере НАЙСВІЖІШИЙ результат і лишає лише ті,
+// що виходять за межі референтного діапазону.
+function isOutOfRange(value, ref) {
+  return !!ref && (value < ref[0] || value > ref[1]);
+}
+function latestOutOfRangeMarkers(measurements) {
+  const byKey = {};
+  measurements.forEach((m) => {
+    if (!byKey[m.key] || m.date > byKey[m.key].date) byKey[m.key] = m;
+  });
+  return Object.values(byKey)
+    .filter((m) => isOutOfRange(m.value, m.ref))
+    .sort((a, b) => b.date.localeCompare(a.date));
 }
 
 function statusOf(t) {
@@ -677,6 +704,9 @@ function drawTrendChart() {
       const pad = Math.max((hi - lo) * 0.15, 1);
       yMin = lo - pad; yMax = hi + pad;
 
+      // Точки поза референтним діапазоном — підсвічуємо червоним.
+      const pointColors = points.map((p) => (isOutOfRange(p.value, ref) ? '#E4572E' : '#0F6E6A'));
+
       trendCharts[k] = new Chart(ctx, {
         type: 'line',
         data: {
@@ -686,6 +716,8 @@ function drawTrendChart() {
             data: values,
             borderColor: '#0F6E6A',
             backgroundColor: 'rgba(15,110,106,0.12)',
+            pointBackgroundColor: pointColors,
+            pointBorderColor: pointColors,
             tension: 0.25,
             fill: true,
             pointRadius: points.length === 1 ? 5 : 4,
@@ -701,7 +733,7 @@ function drawTrendChart() {
       const infoEl = document.getElementById(`trend-info-${k}`);
       if (infoEl) {
         infoEl.innerHTML = ref
-          ? `<p class="muted">Заштрихована смуга — орієнтовна норма ${ref[0]}–${ref[1] >= 999 ? '∞' : ref[1]}. Це загальний довідковий діапазон, не заміна оцінки лікаря.</p>`
+          ? `<p class="muted">Заштрихована смуга — орієнтовна норма ${ref[0]}–${ref[1] >= 999 ? '∞' : ref[1]}. Червоні точки — значення поза цим діапазоном. Це загальний довідковий діапазон, не заміна оцінки лікаря.</p>`
           : `<p class="muted">Референс невідомий (власний показник).</p>`;
       }
     });

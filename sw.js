@@ -1,4 +1,4 @@
-const CACHE = 'health-vault-v10';
+const CACHE = 'health-vault-v11';
 const ASSETS = [
   './',
   './index.html',
