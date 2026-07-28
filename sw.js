@@ -1,4 +1,4 @@
-const CACHE = 'health-vault-v11';
+const CACHE = 'health-vault-v12';
 const ASSETS = [
   './',
   './index.html',
@@ -8,7 +8,7 @@ const ASSETS = [
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
-  './assets/corner-vine.svg',
+  './assets/vine-bg.jpg',
   './assets/header-vine.svg',
   './assets/empty-illustration.svg'
 ];

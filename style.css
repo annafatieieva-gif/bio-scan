@@ -24,18 +24,17 @@ body{
   min-height:100vh;
   position:relative;
 }
-body::before,body::after{
+body::before{
   content:'';
   position:fixed;
-  width:170px;height:380px;
-  background-image:url('assets/corner-vine.svg');
+  inset:0;
+  background-image:url('assets/vine-bg.jpg');
   background-repeat:no-repeat;
-  background-size:contain;
+  background-position:top center;
+  background-size:cover;
   pointer-events:none;
   z-index:-1;
 }
-body::before{ top:calc(env(safe-area-inset-top) + 60px); left:-26px; }
-body::after{ bottom:-26px; right:-26px; transform:scaleX(-1); }
 .topbar{
   position:sticky;top:0;z-index:10;
   background-color:var(--teal);
