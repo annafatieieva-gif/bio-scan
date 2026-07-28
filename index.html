@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>My BioScan</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0F6E6A">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <img src="icons/icon-192.png" class="brand-mark" alt="">
+    <span class="brand-name">My BioScan</span>
+  </div>
+</header>
+
+<main id="view-root"></main>
+
+<nav class="tabbar" id="tabbar">
+  <button class="tab active" data-tab="home">
+    <svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5M5 10v9h5v-5h4v5h5v-9"/></svg>
+    <span>Головна</span>
+  </button>
+  <button class="tab" data-tab="records">
+    <svg viewBox="0 0 24 24"><path d="M6 2h9l4 4v16H6z"/><path d="M15 2v4h4"/><path d="M9 12h6M9 16h6"/></svg>
+    <span>Записи</span>
+  </button>
+  <button class="tab" data-tab="trends">
+    <svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16"/><path d="M7 15l4-5 3 3 5-7"/></svg>
+    <span>Динаміка</span>
+  </button>
+  <button class="tab" data-tab="reminders">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="7"/><path d="M12 9v4l3 2M9 2h6"/></svg>
+    <span>Нагадування</span>
+  </button>
+</nav>
+
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="ocr.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
