@@ -38,10 +38,6 @@ body::before{
 .topbar{
   position:sticky;top:0;z-index:10;
   background-color:var(--teal);
-  background-image:url('assets/header-vine.svg');
-  background-repeat:no-repeat;
-  background-position:right bottom;
-  background-size:220px auto;
   color:#fff;
   padding:calc(14px + env(safe-area-inset-top)) 20px 14px;
   display:flex;align-items:center;
@@ -154,7 +150,6 @@ table.marker-table td,table.marker-table th{padding:6px 4px;border-bottom:1px so
 
 .empty{text-align:center;padding:30px 10px 40px;color:var(--muted);}
 .empty .big{font-size:38px;margin-bottom:10px;}
-.empty-illustration{width:150px;height:auto;display:block;margin:0 auto 14px;}
 
 .chip-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
 .chip{

@@ -243,7 +243,7 @@ function reminderLine(t) {
 async function viewRecords() {
   const records = (await dbGetAll('records')).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   if (!records.length) {
-    return `<h1>Записи</h1><div class="empty"><img src="assets/empty-illustration.svg" class="empty-illustration" alt=""><p>Тут з'являться фото висновків та PDF з результатами аналізів.<br>Натисни «＋», щоб додати перший запис.</p></div>`;
+    return `<h1>Записи</h1><div class="empty"><p>Тут з'являться фото висновків та PDF з результатами аналізів.<br>Натисни «＋», щоб додати перший запис.</p></div>`;
   }
   let html = `<h1>Записи</h1><div class="card">`;
   records.forEach((r) => {
@@ -617,7 +617,7 @@ async function savePinnedMarkers(keys) {
 async function viewTrends() {
   const measurements = await dbGetAll('measurements');
   if (!measurements.length) {
-    return `<h1>Динаміка</h1><div class="empty"><img src="assets/empty-illustration.svg" class="empty-illustration" alt=""><p>Як тільки з'являться збережені показники з фото, PDF або ручного вводу — тут з'являться графіки.</p></div>`;
+    return `<h1>Динаміка</h1><div class="empty"><p>Як тільки з'являться збережені показники з фото, PDF або ручного вводу — тут з'являться графіки.</p></div>`;
   }
   // Показники в чіпах — лише ті, для яких реально є хоч один збережений результат.
   const keys = [...new Set(measurements.map((m) => m.key))];
@@ -746,7 +746,7 @@ async function viewReminders() {
   const pushCard = await renderPushCard();
   if (!tests.length) {
     // засіяти дефолтний набір при першому відкритті
-    return `<h1>Нагадування</h1><div class="empty"><img src="assets/empty-illustration.svg" class="empty-illustration" alt=""><p>Додай аналізи, за якими хочеш стежити регулярно.</p>
+    return `<h1>Нагадування</h1><div class="empty"><p>Додай аналізи, за якими хочеш стежити регулярно.</p>
     <button class="btn" id="btn-seed-defaults" style="margin-top:14px">Додати типовий набір</button></div>${pushCard}`;
   }
   const withStatus = tests.map(statusOf).sort((a, b) => a.daysLeft - b.daysLeft);
